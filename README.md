@@ -38,7 +38,7 @@ pip install -r requirements.txt
 
 ### 1. Verify Setup (run first)
 ```bash
-cd federated_game
+cd MathematicalModelling
 python demo.py
 ```
 Expected output: FL experiment runs, Nash Equilibrium computed, game simulated.
