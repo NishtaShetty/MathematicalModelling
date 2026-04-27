@@ -142,7 +142,7 @@ def run_fl_experiment(
     train_dataset, test_dataset = load_mnist()
     client_data = non_iid_partition(train_dataset, n_clients,
                                     classes_per_client=2,
-                                    samples_per_class=250)
+                                    samples_per_class=50)
     test_loader = get_test_loader(test_dataset)
 
     # Initialize model and server

@@ -1,126 +1,107 @@
 # Stochastic Game-Theoretic Modelling of Adversarial Attacks in Federated Learning
 
-## Project Structure
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Federated Learning](https://img.shields.io/badge/Focus-Federated%20Learning-orange.svg)]()
 
-```
-federated_game/
-├── data/
-│   └── partition.py          ← MNIST loading, IID/Non-IID partitioning
-├── models/
-│   └── cnn.py                ← SimpleCNN (shared global model)
-├── clients/
-│   ├── honest_client.py      ← Standard FL client
-│   └── adversarial_client.py ← Malicious client (5 attack types)
-├── server/
-│   └── aggregator.py         ← Server with 4 defense strategies
-├── game/
-│   └── stochastic_game.py    ← CORE: Stochastic game, Nash solver, VI
-├── experiments/
-│   ├── fl_trainer.py         ← Single FL experiment runner
-│   └── run_experiments.py    ← Full grid + plots
-├── results/
-│   └── plotter.py            ← All paper figures
-├── demo.py                   ← Quick test (run this first)
-└── requirements.txt
-```
+A comprehensive framework for simulating adversarial attacks (Gradient Scaling, Label Flipping, etc.) and robust defense strategies (Krum, Trimmed Mean, etc.) in Federated Learning environments, modeled as a **Stochastic Game**.
 
 ---
 
-## Setup
+## 🚀 Quick Start
+
+Get the simulation running in under a minute:
 
 ```bash
+# 1. Install dependencies
 pip install -r requirements.txt
+
+# 2. Run the quick validation script
+python experiments/run_experiments_quick.py
+```
+*Expected output: A miniature FL experiment runs, Nash Equilibrium is computed, and sample plots are generated in `results/plots/`.*
+
+---
+
+## 📂 Project Structure
+
+```bash
+.
+├── data/
+│   └── partition.py          # MNIST loading & IID/Non-IID partitioning
+├── models/
+│   └── cnn.py                # SimpleCNN global model architecture
+├── clients/
+│   ├── honest_client.py      # Standard FL client logic
+│   └── adversarial_client.py # Malicious client (5 attack types implemented)
+├── server/
+│   └── aggregator.py         # Server-side robust aggregation (4 defenses)
+├── game/
+│   └── stochastic_game.py    # CORE: Nash solver, Value Iteration, Game Logic
+├── experiments/
+│   ├── fl_trainer.py         # Individual FL experiment engine
+│   ├── run_experiments.py    # Full grid execution (60+ scenarios)
+│   └── run_experiments_quick.py # Fast validation & pipeline test
+├── results/
+│   ├── plotter.py            # Automated visualization engine
+│   ├── federated_learning_graphs.md # Visual summary of all research figures
+│   └── simulation_trajectories.csv # Raw data for longitudinal analysis
+├── Federated_Learning_Paper.md # Formal 11-figure research manuscript
+├── Experimental_Data_Appendix.md # Supplementary data & state transitions
+└── demo.py                   # Legacy single-run demonstration
 ```
 
 ---
 
-## How to Run
+## 🛠️ Experimentation & Research
 
-### 1. Verify Setup (run first)
-```bash
-python demo.py
-```
-Expected output: FL experiment runs, Nash Equilibrium computed, game simulated.
-
-### 2. Run Full Experiment Grid
+### 1. Full Grid Simulation
+To replicate the full study (5 attacks × 4 defenses × 3 adversary ratios):
 ```bash
 python experiments/run_experiments.py
 ```
-This runs all 60 experiments (5 attacks × 4 defenses × 3 adversary ratios) and generates all paper figures.
+This generates 11 distinct figures analyzing everything from accuracy convergence to Nash strategy stability.
 
-### 3. Single Experiment (custom config)
+### 2. Custom Experiment
 ```python
 from experiments.fl_trainer import run_fl_experiment
 
 result = run_fl_experiment(
     n_clients       = 10,
-    adversary_ratio = 0.3,      # 30% adversarial
-    attack_type     = 'gradient_scale',
-    defense         = 'krum',
-    rounds          = 50,
-    local_epochs    = 3
+    adversary_ratio = 0.3,
+    attack_type     = 'gradient_scale', # options: label_flip, sign_flip, gaussian_noise
+    defense         = 'krum',           # options: trimmed_mean, median, fedavg
+    rounds          = 50
 )
-print(result['config']['final_accuracy'])
-```
-
-### 4. Game Analysis Only (with your own payoffs)
-```python
-import numpy as np
-from game.stochastic_game import StochasticGame
-
-game = StochasticGame(adversary_ratio=0.3)
-
-# Your empirical payoff matrix [5 attacks x 4 defenses]
-payoffs = np.array([...])
-game.set_payoffs(payoffs)
-
-# Nash Equilibrium
-equilibria = game.compute_nash_equilibrium()
-
-# Value Iteration
-V, policy_a, policy_d = game.value_iteration()
+print(f"Final Test Accuracy: {result['config']['final_accuracy']:.2%}")
 ```
 
 ---
 
-## Attack Types
-| Attack | Description |
-|---|---|
-| `no_attack` | Honest behavior (baseline) |
-| `gradient_scale` | Multiplies gradients by -5 (severe damage) |
-| `label_flip` | Flips label 1→7 during training |
-| `sign_flip` | Negates all gradient directions |
-| `gaussian_noise` | Adds large Gaussian noise to weights |
+## 📊 Visual Results Showcase
 
-## Defense Strategies
-| Defense | Description |
+The project generates high-fidelity visualizations for research analysis. A detailed view of all figures can be found in **[results/federated_learning_graphs.md](file:///f:/6th%20sem/mathematicalmodelling/results/federated_learning_graphs.md)**.
+
+| Category | Key Figures |
 |---|---|
-| `fedavg` | Simple average (no defense) |
-| `krum` | Select most consistent update |
-| `trimmed_mean` | Remove top/bottom 20% updates |
-| `median` | Coordinate-wise median |
+| **Training Dynamics** | Accuracy curves (Attacks vs Defenses), Adversary Ratio effects |
+| **Game Theory** | Payoff heatmaps, Nash Equilibrium mixed strategies |
+| **Robustness** | Multi-dimensional Radar charts, State transition heatmaps |
+| **Sensitivity** | Hyperparameter heatmaps (Local epochs vs Accuracy) |
 
 ---
 
-## Paper Figures Generated
-- `fig1_attacks_vs_krum.png` — Accuracy curves, all attacks vs Krum
-- `fig2_defenses_vs_grad_scale.png` — All defenses vs gradient scaling
-- `fig3_payoff_heatmap_*.png` — Payoff matrix heatmaps per adversary ratio
-- `fig4_nash_*.png` — Nash Equilibrium mixed strategies
-- `fig5_adv_ratio_effect.png` — Defense robustness vs adversary ratio
-- `fig6_nash_vs_baseline_*.png` — Nash strategies vs no-defense comparison
+## 🧠 Game-Theoretic Framework
+
+The interaction between the **Attacker** (adversarial clients) and the **Defender** (the server aggregator) is modeled as a **Stochastic Game** $G = (S, N, A, P, R, \gamma)$:
+
+*   **States ($S$):** Accuracy levels {LOW, MID, HIGH}.
+*   **Players ($N$):** Attacker vs. Defender.
+*   **Actions ($A$):** 5 Attack types × 4 Defense strategies.
+*   **Rewards ($R$):** Zero-sum based on accuracy drop/retention.
+*   **Solution**: Computed via **Nash Equilibrium Support Enumeration** and **Value Iteration (Bellman Optimality)**.
 
 ---
 
-## Game-Theoretic Model
-
-**Stochastic Game G = (S, N, A, P, R, γ)**
-
-- **S**: States = {LOW, MID, HIGH} (accuracy buckets)
-- **N**: Players = {Attacker, Defender}
-- **A**: Attacker × Defender action spaces (5 × 4)
-- **P**: Stochastic transition P(s'|s, a_attack, a_defense)
-- **R**: Attacker reward = accuracy_drop; Defender reward = accuracy
-- **γ**: Discount factor = 0.9
-
-**Solution Concept**: Nash Equilibrium via support enumeration (nashpy) + Value Iteration (Bellman equations)
+## 📝 License
+Distributed under the MIT License. See `LICENSE` for more information.

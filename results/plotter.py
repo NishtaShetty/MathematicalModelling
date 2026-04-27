@@ -220,3 +220,63 @@ def plot_summary_table(all_results, adversary_ratios, attack_types,
     fig.savefig(save_path)
     plt.close(fig)
     print(f"  Saved: {save_path}")
+
+
+def plot_robustness_radar(payoff_matrix, attack_labels, defense_labels, title, save_path):
+    """
+    Generate a Radar (Spider) chart comparing defenses across various attacks.
+    """
+    from math import pi
+
+    N = len(attack_labels)
+    angles = [n / float(N) * 2 * pi for n in range(N)]
+    angles += angles[:1]
+
+    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw=dict(polar=True))
+
+    # Ensure payoff_matrix is a numpy array for advanced indexing
+    payoff_matrix = np.array(payoff_matrix)
+
+    for d_idx, defense in enumerate(defense_labels):
+        values = payoff_matrix[:, d_idx].tolist()
+        values += values[:1]
+        ax.plot(angles, values, linewidth=2, linestyle='solid', label=defense, color=COLORS[d_idx])
+        ax.fill(angles, values, color=COLORS[d_idx], alpha=0.1)
+
+    ax.set_theta_offset(pi / 2)
+    ax.set_theta_direction(-1)
+    plt.xticks(angles[:-1], attack_labels, color='grey', size=10)
+    ax.set_rlabel_position(0)
+    plt.yticks([0.25, 0.5, 0.75, 1.0], ["0.25", "0.50", "0.75", "1.0"], color="grey", size=8)
+    plt.ylim(0, 1)
+
+    ax.set_title(title, size=15, y=1.1)
+    ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+    fig.savefig(save_path)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
+
+
+def plot_state_transitions(save_path):
+    """
+    Visualize the stochastic state transitions as a graph or heatmap.
+    """
+    # Using fixed transition data for MID Net Damage from stochastic_game.py
+    # From MID: {'LOW': 0.2, 'MID': 0.6, 'HIGH': 0.2}
+    data = np.array([
+        [0.8, 0.2, 0.0],  # From LOW
+        [0.2, 0.6, 0.2],  # From MID
+        [0.05, 0.35, 0.6] # From HIGH
+    ])
+    states = ['LOW', 'MID', 'HIGH']
+    
+    fig, ax = plt.subplots(figsize=(7, 5))
+    sns.heatmap(data, annot=True, xticklabels=states, yticklabels=states, 
+                cmap='Blues', cbar_kws={'label': 'Transition Probability'}, ax=ax)
+    ax.set_title('Stochastic State Transition Probabilities (Moderate Damage)')
+    ax.set_xlabel('Next State (s\')')
+    ax.set_ylabel('Current State (s)')
+    fig.tight_layout()
+    fig.savefig(save_path)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")
