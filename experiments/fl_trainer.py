@@ -201,6 +201,7 @@ def run_fl_experiment(
     result = {
         'accuracies': accuracies,
         'losses':     losses,
+        'avg_comp_cost': np.mean(server.comp_costs) if server.comp_costs else 0,
         'config': {
             'n_clients':       n_clients,
             'adversary_ratio': adversary_ratio,

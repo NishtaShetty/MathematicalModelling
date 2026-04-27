@@ -280,3 +280,24 @@ def plot_state_transitions(save_path):
     fig.savefig(save_path)
     plt.close(fig)
     print(f"  Saved: {save_path}")
+def plot_cost_effectiveness(costs, accs, labels, title, save_path):
+    """
+    Scatter plot of defense computation cost vs final accuracy.
+    Research highlight: trade-off between robustness and efficiency.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    for i, label in enumerate(labels):
+        ax.scatter(costs[i], accs[i], s=100, color=COLORS[i % len(COLORS)], 
+                   label=label, edgecolors='black', alpha=0.8)
+        ax.text(costs[i] + 0.001, accs[i] + 0.005, label, fontsize=9)
+    
+    ax.set_xlabel('Average Computation Cost (seconds per aggregation)')
+    ax.set_ylabel('Final Test Accuracy')
+    ax.set_title(title)
+    ax.grid(True, linestyle='--', alpha=0.7)
+    # ax.legend()
+    fig.tight_layout()
+    fig.savefig(save_path)
+    plt.close(fig)
+    print(f"  Saved: {save_path}")

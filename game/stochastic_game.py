@@ -34,7 +34,7 @@ from itertools import product
 # ─── Action Spaces ────────────────────────────────────────────────────────────
 
 ATTACK_ACTIONS  = ['no_attack', 'gradient_scale', 'label_flip', 'sign_flip', 'gaussian_noise']
-DEFENSE_ACTIONS = ['fedavg', 'krum', 'trimmed_mean', 'median']
+DEFENSE_ACTIONS = ['fedavg', 'krum', 'trimmed_mean', 'median', 'bulyan']
 
 N_ATTACK  = len(ATTACK_ACTIONS)
 N_DEFENSE = len(DEFENSE_ACTIONS)
@@ -85,6 +85,18 @@ class StochasticGame:
         self.optimal_attack  = None
         self.optimal_defense = None
 
+        # Empirical Transitions: P(s' | s, a, d)
+        # Store as {(s_idx, a_idx, d_idx): {s_next_idx: count}}
+        self.empirical_transitions = {}
+        
+        # Costs for asymmetric rewards
+        self.defense_costs = {
+            'fedavg': 0.0, 'krum': 0.05, 'trimmed_mean': 0.02, 'median': 0.02, 'bulyan': 0.1
+        }
+        self.attack_risks = {
+            'no_attack': 0.0, 'gradient_scale': 0.1, 'label_flip': 0.05, 'sign_flip': 0.08, 'gaussian_noise': 0.03
+        }
+
     # ─── Payoff Matrix Construction ───────────────────────────────────────────
 
     def set_payoffs(self, payoff_matrix):
@@ -113,23 +125,40 @@ class StochasticGame:
     def build_default_payoffs(self):
         """
         Build estimated payoff matrix based on known attack/defense effectiveness.
-        Use this when FL simulation results are not yet available.
-
-        Rows = attacks, Cols = defenses
-        Values = expected accuracy of global model
         """
-        # [no_att, grad_scale, label_flip, sign_flip, gauss_noise]
-        # x [fedavg, krum, trimmed_mean, median]
+        # Rows = attacks, Cols = defenses (fedavg, krum, trimmed, median, bulyan)
         payoffs = np.array([
-            # fedavg   krum    trimmed  median
-            [0.95,    0.95,   0.95,    0.95],   # no_attack
-            [0.50,    0.80,   0.75,    0.78],   # gradient_scale
-            [0.60,    0.72,   0.70,    0.68],   # label_flip
-            [0.45,    0.78,   0.73,    0.76],   # sign_flip
-            [0.65,    0.85,   0.82,    0.80],   # gaussian_noise
+            [0.95, 0.95, 0.95, 0.95, 0.95], # no_attack
+            [0.50, 0.80, 0.75, 0.78, 0.85], # gradient_scale
+            [0.60, 0.72, 0.70, 0.68, 0.75], # label_flip
+            [0.45, 0.78, 0.73, 0.76, 0.82], # sign_flip
+            [0.65, 0.85, 0.82, 0.80, 0.88], # gaussian_noise
         ])
         self.set_payoffs(payoffs)
         return payoffs
+
+    def fit_transitions(self, all_accuracies):
+        """
+        Estimate P(s' | s, a, d) from simulation results.
+        all_accuracies: dict {(a, d): [acc_round0, acc_round1, ...]}
+        """
+        for (a_idx, d_idx), accs in all_accuracies.items():
+            for i in range(len(accs) - 1):
+                s_curr = state_to_idx(accuracy_to_state(accs[i]))
+                s_next = state_to_idx(accuracy_to_state(accs[i+1]))
+                
+                key = (s_curr, a_idx, d_idx)
+                if key not in self.empirical_transitions:
+                    self.empirical_transitions[key] = np.zeros(len(STATES))
+                self.empirical_transitions[key][s_next] += 1
+        
+        # Normalize
+        for key in self.empirical_transitions:
+            total = np.sum(self.empirical_transitions[key])
+            if total > 0:
+                self.empirical_transitions[key] /= total
+        
+        print(f"[Game] Fitted empirical transitions for {len(self.empirical_transitions)} state-action pairs.")
 
     # ─── Nash Equilibrium ─────────────────────────────────────────────────────
 
@@ -207,12 +236,20 @@ class StochasticGame:
 
                         # Expected future value
                         future = sum(
-                            next_state_dist[s2] * V[state_to_idx(s2)]
-                            for s2 in STATES
+                            next_state_dist[s_next_name] * V[state_to_idx(s_next_name)]
+                            for s_next_name in STATES
                         )
 
-                        # Attacker's expected payoff from this joint action
-                        q_val = r_att + self.gamma * future
+                        # Incorporate Costs (Asymmetric Rewards)
+                        # Attacker Payoff = Accuracy Drop - Risk
+                        q_att = (r_att - self.attack_risks[ATTACK_ACTIONS[a_idx]]) + self.gamma * future
+                        
+                        # Defender wants to maximize (Accuracy - Defense Cost)
+                        # Since we solve as max_a min_d on Attacker Payoff, 
+                        # we can alternatively model it as a general sum game or 
+                        # just keep it zero-sum-ish but with added costs.
+                        # For a publication, we'll use the proper Bellman for zero-sum with costs:
+                        q_val = q_att + self.defense_costs[DEFENSE_ACTIONS[d_idx]]
 
                         if q_val < worst_for_defender:
                             worst_for_defender = q_val
@@ -248,23 +285,20 @@ class StochasticGame:
 
     def _transition(self, state, a_idx, d_idx):
         """
-        Stochastic transition: P(s'|s, attack, defense).
-
-        Returns:
-            dict {state_name: probability}
-
-        Logic:
-            - Strong attacks push state toward LOW
-            - Strong defenses push state toward HIGH
-            - Current state has inertia
+        Returns: dict {state_name: probability}
+        Uses empirical data if available, otherwise falls back to heuristic.
         """
-        # Attack damage scores (higher = more damaging)
-        attack_damage  = [0.0, 0.8, 0.5, 0.7, 0.3]   # no_attack→0, grad_scale→0.8
-        # Defense effectiveness scores (higher = better defense)
-        defense_effect = [0.1, 0.7, 0.6, 0.65]        # fedavg→0.1, krum→0.7
+        s_idx = state_to_idx(state)
+        if (s_idx, a_idx, d_idx) in self.empirical_transitions:
+            probs = self.empirical_transitions[(s_idx, a_idx, d_idx)]
+            return {STATES[i]: probs[i] for i in range(len(STATES))}
+
+        # Fallback to heuristic
+        attack_damage  = [0.0, 0.8, 0.5, 0.7, 0.3]
+        defense_effect = [0.1, 0.7, 0.6, 0.65, 0.85] # bulyan is 0.85
 
         net_damage = attack_damage[a_idx] * (1.0 - defense_effect[d_idx])
-
+        # ... (rest of heuristic logic)
         if state == 'HIGH':
             if net_damage > 0.5:
                 return {'LOW': 0.1, 'MID': 0.6, 'HIGH': 0.3}
@@ -272,7 +306,6 @@ class StochasticGame:
                 return {'LOW': 0.05, 'MID': 0.35, 'HIGH': 0.6}
             else:
                 return {'LOW': 0.0,  'MID': 0.1,  'HIGH': 0.9}
-
         elif state == 'MID':
             if net_damage > 0.5:
                 return {'LOW': 0.5,  'MID': 0.4, 'HIGH': 0.1}
@@ -280,7 +313,6 @@ class StochasticGame:
                 return {'LOW': 0.2,  'MID': 0.6, 'HIGH': 0.2}
             else:
                 return {'LOW': 0.05, 'MID': 0.45, 'HIGH': 0.5}
-
         else:  # LOW
             if net_damage > 0.5:
                 return {'LOW': 0.8, 'MID': 0.2,  'HIGH': 0.0}

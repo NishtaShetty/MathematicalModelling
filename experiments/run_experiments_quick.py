@@ -23,6 +23,7 @@ if __name__ == '__main__':
     
     print("\nRunning game analysis...")
     game_results = run_game_analysis(
+        all_results      = all_results,
         payoff_matrices  = payoff_matrices,
         adversary_ratios = ADVERSARY_RATIOS,
         save_dir         = SAVE_DIR

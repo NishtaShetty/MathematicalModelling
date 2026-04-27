@@ -23,13 +23,14 @@ class FederatedServer:
         device (str): 'cpu' or 'cuda'.
     """
 
-    DEFENSES = ['fedavg', 'krum', 'trimmed_mean', 'median']
+    DEFENSES = ['fedavg', 'krum', 'trimmed_mean', 'median', 'bulyan']
 
     def __init__(self, global_model, device='cpu'):
         self.model  = copy.deepcopy(global_model)
         self.device = device
         self.model.to(device)
         self.round  = 0
+        self.comp_costs = [] # Track time taken for each aggregation
 
     def get_global_model(self):
         return self.model
@@ -41,15 +42,17 @@ class FederatedServer:
         Args:
             client_updates (list of state_dicts): Updates from selected clients.
             strategy (str): Aggregation method.
-            f (int): Number of assumed Byzantine clients (used by Krum).
+            f (int): Number of assumed Byzantine clients (used by Krum/Bulyan).
             trim_ratio (float): Fraction to trim on each side (used by Trimmed Mean).
 
         Returns:
             dict: New global model state_dict.
         """
+        import time
         assert strategy in self.DEFENSES, \
             f"Unknown strategy '{strategy}'. Choose from {self.DEFENSES}"
 
+        start_time = time.time()
         if strategy == 'fedavg':
             new_state = self._fedavg(client_updates)
         elif strategy == 'krum':
@@ -58,6 +61,11 @@ class FederatedServer:
             new_state = self._trimmed_mean(client_updates, trim_ratio=trim_ratio)
         elif strategy == 'median':
             new_state = self._coordinate_median(client_updates)
+        elif strategy == 'bulyan':
+            new_state = self._bulyan(client_updates, f=f)
+        
+        duration = time.time() - start_time
+        self.comp_costs.append(duration)
 
         self.model.load_state_dict(new_state)
         self.round += 1
@@ -78,10 +86,12 @@ class FederatedServer:
         Krum (Blanchard et al., 2017):
         Select the update with the smallest sum of squared distances
         to its (n - f - 2) nearest neighbors.
-
-        f = number of assumed Byzantine workers.
         """
         n = len(updates)
+        if n <= 2 * f + 2:
+            # Fallback if too few clients for Krum
+            return self._fedavg(updates)
+
         # Flatten each update to a vector
         flat = []
         for u in updates:
@@ -103,13 +113,46 @@ class FederatedServer:
         best_idx = int(np.argmin(scores))
         return updates[best_idx]
 
+    def _bulyan(self, updates, f=1):
+        """
+        Bulyan (Guerraoui et al., 2018):
+        Combines Krum and Trimmed Mean. 
+        Iteratively runs Krum to select (n - 2f) reliable updates, 
+        then performs coordinate-wise trimmed mean on them.
+        """
+        n = len(updates)
+        theta = n - 2 * f
+        if theta <= 0:
+            return self._fedavg(updates)
+
+        selected_updates = []
+        remaining_updates = list(range(n))
+        
+        # Iteratively select updates using Krum logic
+        for _ in range(theta):
+            # We need to run a mini-Krum on remaining updates
+            current_updates = [updates[i] for i in remaining_updates]
+            # Since Krum returns an update, we find which one it was
+            best_in_current = self._krum(current_updates, f=f)
+            
+            # Find the index in the original list (this is a bit slow but clear)
+            for i in remaining_updates:
+                if updates[i] is best_in_current: # Reference check
+                    selected_updates.append(updates[i])
+                    remaining_updates.remove(i)
+                    break
+        
+        # Now apply Trimmed Mean on the selected theta updates
+        # Usually Bulyan uses a specific trimming (n - 4f) but we'll use a standard trimmed mean
+        return self._trimmed_mean(selected_updates, trim_ratio=0.1)
+
     def _trimmed_mean(self, updates, trim_ratio=0.2):
         """
         Trimmed Mean (Yin et al., 2018):
         For each parameter coordinate, remove the top and bottom
         `trim_ratio` fraction of values, then average the rest.
         """
-        k = max(1, int(len(updates) * trim_ratio))
+        k = int(len(updates) * trim_ratio)
         trimmed = {}
         for key in updates[0]:
             stacked = torch.stack([u[key].float() for u in updates])  # [n, ...]
@@ -127,7 +170,6 @@ class FederatedServer:
         """
         Coordinate-wise Median:
         For each parameter, take the median across all clients.
-        Robust to up to 50% Byzantine workers.
         """
         median = {}
         for key in updates[0]:

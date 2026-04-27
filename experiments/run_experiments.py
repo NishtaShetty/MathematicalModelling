@@ -26,7 +26,7 @@ from results.plotter import (plot_accuracy_curves, plot_payoff_heatmap,
 def run_full_grid(
     adversary_ratios = [0.1, 0.2, 0.3],
     attack_types     = ['no_attack', 'gradient_scale', 'label_flip', 'sign_flip', 'gaussian_noise'],
-    defense_types    = ['fedavg', 'krum', 'trimmed_mean', 'median'],
+    defense_types    = ['fedavg', 'krum', 'trimmed_mean', 'median', 'bulyan'],
     rounds           = 50,
     n_clients        = 10,
     save_dir         = './results'
@@ -102,7 +102,7 @@ def run_full_grid(
     return all_results, payoff_matrices
 
 
-def run_game_analysis(payoff_matrices, adversary_ratios, save_dir='./results'):
+def run_game_analysis(all_results, payoff_matrices, adversary_ratios, save_dir='./results'):
     """
     For each adversary ratio, run the stochastic game analysis:
       1. Set empirical payoff matrices
@@ -119,6 +119,17 @@ def run_game_analysis(payoff_matrices, adversary_ratios, save_dir='./results'):
 
         game = StochasticGame(adversary_ratio=adv_ratio, gamma=0.9)
         game.set_payoffs(payoff_matrices[adv_ratio])
+
+        # Step 2.1: Fit empirical transitions from simulation data
+        # We need a mapping {(a_idx, d_idx): [accuracies]}
+        all_accuracies = {}
+        for (res_adv, attack, defense), res in all_results.items():
+            if res_adv == adv_ratio:
+                a_idx = ATTACK_ACTIONS.index(attack)
+                d_idx = DEFENSE_ACTIONS.index(defense)
+                all_accuracies[(a_idx, d_idx)] = res['accuracies']
+        
+        game.fit_transitions(all_accuracies)
 
         # Compute Nash Equilibrium
         equilibria = game.compute_nash_equilibrium()
@@ -225,6 +236,26 @@ def generate_all_plots(all_results, payoff_matrices, game_results,
             save_path=f"{save_dir}/fig6_nash_vs_baseline_{int(adv_ratio*100)}.png"
         )
 
+    # Figure 12: Cost-Accuracy Scatter Plot (Research contribution)
+    adv = 0.3
+    costs = []
+    accs = []
+    labels = []
+    for defense in defense_types:
+        key = (adv, 'gradient_scale', defense)
+        if key in all_results:
+            costs.append(all_results[key]['avg_comp_cost'])
+            accs.append(all_results[key]['config']['final_accuracy'])
+            labels.append(defense)
+    
+    # We'll need a new function in plotter.py for this, or just use a placeholder
+    from results.plotter import plot_cost_effectiveness
+    plot_cost_effectiveness(
+        costs, accs, labels,
+        title=f"Defense Cost-Effectiveness (Attack: Grad Scale, adv={adv*100:.0f}%)",
+        save_path=f"{save_dir}/fig12_cost_effectiveness.png"
+    )
+
     print(f"  All plots saved.")
 
 
@@ -233,7 +264,7 @@ def generate_all_plots(all_results, payoff_matrices, game_results,
 if __name__ == '__main__':
     ADVERSARY_RATIOS = [0.1, 0.3]
     ATTACK_TYPES     = ['no_attack', 'gradient_scale', 'label_flip']
-    DEFENSE_TYPES    = ['fedavg', 'krum']
+    DEFENSE_TYPES    = ['fedavg', 'krum', 'bulyan']
     ROUNDS           = 5
     N_CLIENTS        = 10
     SAVE_DIR         = './results'
@@ -250,6 +281,7 @@ if __name__ == '__main__':
 
     # Step 2: Game-theoretic analysis
     game_results = run_game_analysis(
+        all_results      = all_results,
         payoff_matrices  = payoff_matrices,
         adversary_ratios = ADVERSARY_RATIOS,
         save_dir         = SAVE_DIR
