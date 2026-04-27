@@ -49,7 +49,15 @@ def setup_clients(train_dataset, client_data, global_model,
 
     clients = []
     for cid in range(n_clients):
-        if cid in adversary_ids:
+        # Special case: 'no_attack' means all clients are honest
+        if attack_type == 'no_attack':
+            client = HonestClient(
+                client_id=cid,
+                dataloader=loaders[cid],
+                model=copy.deepcopy(global_model),
+                device=device
+            )
+        elif cid in adversary_ids:
             # For label flip: provide a flipped dataloader
             if attack_type == 'label_flip':
                 fl_loader = label_flip_loader(
