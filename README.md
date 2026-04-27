@@ -19,7 +19,10 @@ federated_game/
 │   ├── fl_trainer.py         ← Single FL experiment runner
 │   └── run_experiments.py    ← Full grid + plots
 ├── results/
-│   └── plotter.py            ← All paper figures
+│   ├── plotter.py            ← All paper figures
+│   └── simulation_trajectories.csv ← Raw simulation data
+├── Federated_Learning_Paper.md ← Formal 11-figure manuscript
+├── Experimental_Data_Appendix.md ← Supplementary research data
 ├── demo.py                   ← Quick test (run this first)
 └── requirements.txt
 ```
@@ -110,6 +113,11 @@ V, policy_a, policy_d = game.value_iteration()
 - `fig4_nash_*.png` — Nash Equilibrium mixed strategies
 - `fig5_adv_ratio_effect.png` — Defense robustness vs adversary ratio
 - `fig6_nash_vs_baseline_*.png` — Nash strategies vs no-defense comparison
+- `fig7_robustness_radar.png` — Multi-dimensional defense robustness radar
+- `fig8_state_transitions.png` — Stochastic state transition heatmap
+- `fig9_summary_bar.png` — Comprehensive attack/defense summary
+- `fig10_adversary_ratio_breakdown.png` — Critical breakdown analysis (>40% ratio)
+- `fig11_hyperparameter_sensitivity.png` — Local epochs ($E$) vs accuracy heatmap
 
 ---
 

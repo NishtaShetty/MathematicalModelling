@@ -66,7 +66,7 @@ def run_full_grid(
                     attack_type     = attack,
                     defense         = defense,
                     rounds          = rounds,
-                    local_epochs    = 3,
+                    local_epochs    = 1,
                     verbose         = False
                 )
 
@@ -231,10 +231,10 @@ def generate_all_plots(all_results, payoff_matrices, game_results,
 # ─── MAIN ────────────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
-    ADVERSARY_RATIOS = [0.1, 0.2, 0.3]
-    ATTACK_TYPES     = ['no_attack', 'gradient_scale', 'label_flip', 'sign_flip', 'gaussian_noise']
-    DEFENSE_TYPES    = ['fedavg', 'krum', 'trimmed_mean', 'median']
-    ROUNDS           = 50
+    ADVERSARY_RATIOS = [0.1, 0.3]
+    ATTACK_TYPES     = ['no_attack', 'gradient_scale', 'label_flip']
+    DEFENSE_TYPES    = ['fedavg', 'krum']
+    ROUNDS           = 5
     N_CLIENTS        = 10
     SAVE_DIR         = './results'
 

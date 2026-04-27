@@ -49,7 +49,8 @@ def setup_clients(train_dataset, client_data, global_model,
 
     clients = []
     for cid in range(n_clients):
-        if cid in adversary_ids:
+        # Only create AdversarialClient if it's an adversary AND attack_type is not no_attack
+        if cid in adversary_ids and attack_type != 'no_attack':
             # For label flip: provide a flipped dataloader
             if attack_type == 'label_flip':
                 fl_loader = label_flip_loader(
@@ -134,7 +135,7 @@ def run_fl_experiment(
     train_dataset, test_dataset = load_mnist()
     client_data = non_iid_partition(train_dataset, n_clients,
                                     classes_per_client=2,
-                                    samples_per_class=250)
+                                    samples_per_class=50)
     test_loader = get_test_loader(test_dataset)
 
     # Initialize model and server
