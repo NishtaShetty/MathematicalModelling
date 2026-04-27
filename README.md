@@ -1,10 +1,6 @@
 # Stochastic Game-Theoretic Modelling of Adversarial Attacks in Federated Learning
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Federated Learning](https://img.shields.io/badge/Focus-Federated%20Learning-orange.svg)]()
-
-A comprehensive framework for simulating adversarial attacks (Gradient Scaling, Label Flipping, etc.) and robust defense strategies (Krum, Trimmed Mean, etc.) in Federated Learning environments, modeled as a **Stochastic Game**.
+A comprehensive research framework for simulating adversarial attacks and robust defense strategies in Federated Learning, modeled as a **Data-Driven Stochastic Game**.
 
 ---
 
@@ -19,7 +15,7 @@ pip install -r requirements.txt
 # 2. Run the quick validation script
 python experiments/run_experiments_quick.py
 ```
-*Expected output: A miniature FL experiment runs, Nash Equilibrium is computed, and sample plots are generated in `results/plots/`.*
+*Expected output: A miniature FL experiment runs, empirical state transitions are fitted, Nash Equilibrium is computed, and sample plots are generated in `results/plots/`.*
 
 ---
 
@@ -35,18 +31,18 @@ python experiments/run_experiments_quick.py
 │   ├── honest_client.py      # Standard FL client logic
 │   └── adversarial_client.py # Malicious client (5 attack types implemented)
 ├── server/
-│   └── aggregator.py         # Server-side robust aggregation (4 defenses)
+│   └── aggregator.py         # Robust aggregation (FedAvg, Krum, Trimmed Mean, Median, Bulyan)
 ├── game/
-│   └── stochastic_game.py    # CORE: Nash solver, Value Iteration, Game Logic
+│   └── stochastic_game.py    # CORE: Empirical Transition fitting, Nash solver, Value Iteration
 ├── experiments/
-│   ├── fl_trainer.py         # Individual FL experiment engine
-│   ├── run_experiments.py    # Full grid execution (60+ scenarios)
-│   └── run_experiments_quick.py # Fast validation & pipeline test
+│   ├── fl_trainer.py         # FL engine with cost & transition tracking
+│   ├── run_experiments.py    # Full research grid execution
+│   └── run_experiments_quick.py # Pipeline validation script
 ├── results/
-│   ├── plotter.py            # Automated visualization engine
+│   ├── plotter.py            # visualization engine (Line, Heatmap, Radar, Cost-Scatter)
 │   ├── federated_learning_graphs.md # Visual summary of all research figures
-│   └── simulation_trajectories.csv # Raw data for longitudinal analysis
-├── Federated_Learning_Paper.md # Formal 11-figure research manuscript
+│   └── simulation_trajectories.csv # Raw simulation data
+├── Federated_Learning_Paper.md # Formal 12-figure research manuscript
 ├── Experimental_Data_Appendix.md # Supplementary data & state transitions
 └── demo.py                   # Legacy single-run demonstration
 ```
@@ -56,25 +52,20 @@ python experiments/run_experiments_quick.py
 ## 🛠️ Experimentation & Research
 
 ### 1. Full Grid Simulation
-To replicate the full study (5 attacks × 4 defenses × 3 adversary ratios):
+To replicate the full study (5 attacks × 5 defenses × 3 adversary ratios):
 ```bash
 python experiments/run_experiments.py
 ```
-This generates 11 distinct figures analyzing everything from accuracy convergence to Nash strategy stability.
+This script now executes a data-driven pipeline:
+1.  **FL Simulation**: Runs all combinations and logs round-by-round accuracy.
+2.  **Transition Fitting**: Estimates $P(s'|s, a, d)$ based on actual accuracy fluctuations.
+3.  **Game Solving**: Computes Nash Equilibrium using the empirical transition matrix.
 
-### 2. Custom Experiment
-```python
-from experiments.fl_trainer import run_fl_experiment
-
-result = run_fl_experiment(
-    n_clients       = 10,
-    adversary_ratio = 0.3,
-    attack_type     = 'gradient_scale', # options: label_flip, sign_flip, gaussian_noise
-    defense         = 'krum',           # options: trimmed_mean, median, fedavg
-    rounds          = 50
-)
-print(f"Final Test Accuracy: {result['config']['final_accuracy']:.2%}")
-```
+### 2. Research Enhancements
+The framework now supports advanced research-level features:
+*   **Bulyan Defense**: Integrated state-of-the-art Byzantine-robust aggregator.
+*   **Asymmetric Rewards**: Utility functions now incorporate **Defense Computation Cost** and **Attacker Detection Risk**.
+*   **Empirical Markov Chains**: Transitions are fitted from experimental data, moving beyond heuristic assumptions.
 
 ---
 
@@ -86,20 +77,20 @@ The project generates high-fidelity visualizations for research analysis. A deta
 |---|---|
 | **Training Dynamics** | Accuracy curves (Attacks vs Defenses), Adversary Ratio effects |
 | **Game Theory** | Payoff heatmaps, Nash Equilibrium mixed strategies |
-| **Robustness** | Multi-dimensional Radar charts, State transition heatmaps |
-| **Sensitivity** | Hyperparameter heatmaps (Local epochs vs Accuracy) |
+| **Robustness** | Multi-dimensional Radar charts, Empirical state transition heatmaps |
+| **Trade-offs** | **Figure 12: Cost-Effectiveness Scatter Plot** (Robustness vs. Overhead) |
 
 ---
 
 ## 🧠 Game-Theoretic Framework
 
-The interaction between the **Attacker** (adversarial clients) and the **Defender** (the server aggregator) is modeled as a **Stochastic Game** $G = (S, N, A, P, R, \gamma)$:
+The interaction between the **Attacker** (adversarial clients) and the **Defender** (server aggregator) is modeled as a **Stochastic Game** $G = (S, N, A, P, R, \gamma)$:
 
 *   **States ($S$):** Accuracy levels {LOW, MID, HIGH}.
-*   **Players ($N$):** Attacker vs. Defender.
-*   **Actions ($A$):** 5 Attack types × 4 Defense strategies.
-*   **Rewards ($R$):** Zero-sum based on accuracy drop/retention.
-*   **Solution**: Computed via **Nash Equilibrium Support Enumeration** and **Value Iteration (Bellman Optimality)**.
+*   **Actions ($A$):** 5 Attack types × 5 Defense strategies.
+*   **Transitions ($P$):** **Empirically estimated** from round-by-round simulation data.
+*   **Rewards ($R$):** Asymmetric functions considering accuracy, computation time, and attack risk.
+*   **Solution**: Computed via **Nash Equilibrium Support Enumeration** and **Value Iteration**.
 
 ---
 
