@@ -144,6 +144,8 @@ class FederatedServer:
         
         # Now apply Trimmed Mean on the selected theta updates
         # Usually Bulyan uses a specific trimming (n - 4f) but we'll use a standard trimmed mean
+        if not selected_updates:
+            return self._fedavg(updates)
         return self._trimmed_mean(selected_updates, trim_ratio=0.1)
 
     def _trimmed_mean(self, updates, trim_ratio=0.2):

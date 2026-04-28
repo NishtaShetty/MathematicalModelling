@@ -5,8 +5,8 @@ from experiments.run_experiments import run_full_grid, run_game_analysis, genera
 
 if __name__ == '__main__':
     ADVERSARY_RATIOS = [0.3]
-    ATTACK_TYPES     = ['gradient_scale', 'label_flip']
-    DEFENSE_TYPES    = ['fedavg']
+    ATTACK_TYPES     = ['no_attack', 'gradient_scale', 'label_flip', 'sign_flip', 'gaussian_noise']
+    DEFENSE_TYPES    = ['fedavg', 'krum', 'trimmed_mean', 'median', 'bulyan']
     ROUNDS           = 1
     N_CLIENTS        = 4
     SAVE_DIR         = './results'
